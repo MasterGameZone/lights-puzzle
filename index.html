@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Light Out Puzzle - 4x4 Mode</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+      font-family: Arial, sans-serif;
+      color: #fff;
+      text-align: center;
+    }
+    #menu, #winOverlay, #howToPlayOverlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    #menu button, #winOverlay button, #howToPlayOverlay button, #gameContainer button {
+      padding: 0.6rem 1.2rem;
+      margin: 0.6rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #gameContainer {
+      display: none;
+      padding-top: 2vh;
+    }
+    #backGameBtn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+    #targetContainer, #gridContainer {
+      margin: 1rem auto;
+    }
+    .title {
+      font-size: 5vw;
+      margin-bottom: 0.5rem;
+    }
+    #grid, #targetGrid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 0.5rem;
+      width: 90vw; 
+      max-width: 240px;
+      margin: 1rem auto;
+    }
+    .cell {
+      aspect-ratio: 1/1;
+      background: #555;
+      border: 0.2rem solid #333;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+      font-size: 1.2rem;
+    }
+    .on {
+      background: yellow;
+    }
+    .off {
+      background: #111;
+    }
+    #winOverlay, #howToPlayOverlay {
+      display: none;
+    }
+    #hintBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #444;
+      border: 1px solid #666;
+    }
+    #ad-overlay {
+      height: 290px;
+      width: 300px;
+      position: absolute;
+      background-color: white;
+      margin: auto;
+      display: none;
+      z-index: 99;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+
+      #close-start-btn {
+        position: absolute;
+        right: 0;
+        top: 0;
+      }
+
+      p {
+        color: #000000;
+        font-size: 13px;
+        position: absolute;
+        bottom: -16px;
+        left: 0;
+        padding: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main Menu -->
+  <div id="menu">
+    <h1>Light Out Puzzle</h1>
+    <button id="startGameBtn">Start Game</button>
+    <button id="howToPlayBtn">How to Play</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer">
+    <button id="backGameBtn">Back to Menu</button>
+    <button id="hintBtn">💡 Hint</button>
+    <div id="targetContainer">
+      <div class="title">Target</div>
+      <div id="targetGrid"></div>
+    </div>
+    <div id="gridContainer">
+      <div class="title">Your Grid</div>
+      <div id="grid"></div>
+    </div>
+  </div>
+
+  <!-- Win Overlay -->
+  <div id="winOverlay">
+    <h2>Pattern Matched!</h2>
+    <button id="restartBtn">Restart</button>
+    <button id="backBtn">Back</button>
+  </div>
+
+  <!-- How To Play Overlay -->
+  <div id="howToPlayOverlay">
+    <div style="max-width: 400px; padding:20px; background:#333; border-radius:8px;">
+      <h2>How to Play</h2>
+      <p>1. Match your grid to the target pattern shown above</p>
+      <p>2. Clicking a cell toggles it and its adjacent cells (up/down/left/right)</p>
+      <p>3. Yellow = ON, Black = OFF</p>
+      <p>4. Use the hint button 💡 when stuck</p>
+      <button id="closeHowToBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="ad-overlay">
+    <button id="close-start-btn">X</button>
+    <p>Visiting this small ad helps us to grow and update. Thanks for your support! 💖</p> 
+  <!-- Adsterra Ads Code -->
+ <script type="text/javascript">
+	atOptions = {
+		'key' : 'd1ab09c01ab2e203e3236993dd511f73',
+		'format' : 'iframe',
+		'height' : 250,
+		'width' : 300,
+		'params' : {}
+	};
+</script>
+<script type="text/javascript" src="//www.highperformanceformat.com/d1ab09c01ab2e203e3236993dd511f73/invoke.js"></script>
+  </div>
+  <script>
+    const gridSize = 4;
+    let targetPattern = [];
+    let playerGrid = [];
+    let scrambleMoves = 8;
+    let solutionSteps = [];
+
+    const menu = document.getElementById('menu');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const howToPlayBtn = document.getElementById('howToPlayBtn');
+    const gameContainer = document.getElementById('gameContainer');
+    const gridDiv = document.getElementById('grid');
+    const targetGridDiv = document.getElementById('targetGrid');
+    const winOverlay = document.getElementById('winOverlay');
+    const restartBtn = document.getElementById('restartBtn');
+    const backBtn = document.getElementById('backBtn');
+    const howToPlayOverlay = document.getElementById('howToPlayOverlay');
+    const closeHowToBtn = document.getElementById('closeHowToBtn');
+    const backGameBtn = document.getElementById('backGameBtn');
+    const hintBtn = document.getElementById('hintBtn');
+    const adOverlay = document.getElementById('ad-overlay');
+    const closeBtn = document.getElementById('close-start-btn');
+
+    function initPlayerGrid() {
+      playerGrid = Array.from({ length: gridSize }, () => 
+        Array(gridSize).fill(0)
+      );
+      gridDiv.innerHTML = "";
+      
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell', 'off');
+          cell.dataset.row = i;
+          cell.dataset.col = j;
+          cell.addEventListener('click', cellClick);
+          gridDiv.appendChild(cell);
+        }
+      }
+    }
+
+    function initTargetGrid() {
+      targetPattern = Array.from({ length: gridSize }, () => 
+        Array(gridSize).fill(0)
+      );
+      solutionSteps = [];
+      targetGridDiv.innerHTML = "";
+      
+      // Create visible target cells
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell', 'off');
+          targetGridDiv.appendChild(cell);
+        }
+      }
+
+      // Generate solvable pattern
+      const tempGrid = targetPattern.map(row => [...row]);
+      for (let m = 0; m < scrambleMoves; m++) {
+        const randRow = Math.floor(Math.random() * gridSize);
+        const randCol = Math.floor(Math.random() * gridSize);
+        solutionSteps.push([randRow, randCol]);
+        toggleCell(tempGrid, randRow, randCol);
+      }
+      
+      targetPattern = tempGrid;
+      updateGridUI(targetPattern, targetGridDiv);
+    }
+
+    function toggleCell(grid, row, col) {
+      const directions = [
+        [0, 0],
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1]
+      ];
+      
+      directions.forEach(([dx, dy]) => {
+        const newRow = row + dx;
+        const newCol = col + dy;
+        if (newRow >= 0 && newRow < gridSize && newCol >= 0 && newCol < gridSize) {
+          grid[newRow][newCol] = 1 - grid[newRow][newCol];
+        }
+      });
+    }
+
+    function updateGridUI(grid, container) {
+      Array.from(container.children).forEach((cell, index) => {
+        const row = Math.floor(index / gridSize);
+        const col = index % gridSize;
+        cell.className = `cell ${grid[row][col] ? 'on' : 'off'}`;
+      });
+    }
+
+    function cellClick(e) {
+      const row = parseInt(e.target.dataset.row);
+      const col = parseInt(e.target.dataset.col);
+      toggleCell(playerGrid, row, col);
+      updateGridUI(playerGrid, gridDiv);
+      
+      if (checkMatch()) {
+        winOverlay.style.display = 'flex';
+      }
+    }
+
+    function checkMatch() {
+      return playerGrid.every((row, i) => 
+        row.every((cell, j) => cell === targetPattern[i][j])
+      );
+    }
+
+    function realShowHint() {
+      if (solutionSteps.length === 0) return;
+      
+      const [hintRow, hintCol] = solutionSteps.pop();
+      const cell = gridDiv.querySelector(
+        `[data-row="${hintRow}"][data-col="${hintCol}"]`
+      );
+      
+      cell.style.transform = 'scale(1.1)';
+      cell.style.border = '2px solid red';
+      setTimeout(() => {
+        cell.style.transform = '';
+        cell.style.border = '';
+      }, 1000);
+
+      adOverlay.style.display = 'none';
+    }
+
+    function showHint() {
+      adOverlay.style.display = 'block';
+    }
+
+    function startGame() {
+      menu.style.display = 'none';
+      winOverlay.style.display = 'none';
+      gameContainer.style.display = 'block';
+      initTargetGrid();
+      initPlayerGrid();
+    }
+
+    function backToMenu() {
+      gameContainer.style.display = 'none';
+      menu.style.display = 'flex';
+    }
+
+    // Event listeners
+    startGameBtn.addEventListener('click', startGame);
+    howToPlayBtn.addEventListener('click', () => howToPlayOverlay.style.display = 'flex');
+    closeHowToBtn.addEventListener('click', () => howToPlayOverlay.style.display = 'none');
+    restartBtn.addEventListener('click', startGame);
+    backBtn.addEventListener('click', backToMenu);
+    backGameBtn.addEventListener('click', backToMenu);
+    hintBtn.addEventListener('click', showHint);
+    closeBtn.addEventListener('click', realShowHint);
+  </script>
+  <script type='text/javascript' src='//pl26425118.profitableratecpm.com/aa/1e/9f/aa1e9fb07fa2424a957a2ffc6cf38ef6.js'></script>
+</body>
+</html>
